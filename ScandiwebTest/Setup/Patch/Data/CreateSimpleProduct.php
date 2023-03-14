@@ -3,8 +3,10 @@
  * @category    Test
  * @package     Scandiweb_Test
  * @author      Elmurat Karabekov <elmurat.karabekov@scandiweb.com>
- * @copyright   Copyright (c) 2021 Scandiweb, Ltd (https://scandiweb.com)
+ * @copyright   Copyright (c) 2023 Scandiweb, Ltd (https://scandiweb.com)
  */
+
+ declare(strict_types=1);
 
 namespace MyApp\ScandiwebTest\Setup\Patch\Data;
 
@@ -13,6 +15,7 @@ use Magento\Catalog\Api\Data\ProductInterfaceFactory;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Eav\Setup\EavSetup;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\InventoryApi\Api\Data\SourceItemInterface;
 use Magento\InventoryApi\Api\Data\SourceItemInterfaceFactory;
 use Magento\InventoryApi\Api\SourceItemsSaveInterface;
 use Magento\Catalog\Api\CategoryLinkManagementInterface;
@@ -22,6 +25,12 @@ use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Catalog\Model\Product\Type;
 use Magento\Catalog\Model\Product\Visibility;
 use Magento\Framework\Setup\Patch\DataPatchInterface;
+use Magento\Framework\Exception\CouldNotSaveException;
+use Magento\Framework\Exception\InputException;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\Validation\ValidationException;
+
 
 /**
  * Create Migration product class
@@ -32,11 +41,11 @@ class CreateSimpleProduct implements DataPatchInterface
      * @var State
      */
     protected State $appState;
-    
+
     /**
      * @var ProductInterfaceFactory
      */
-    protected ProductInterfaceFactory $productInterfaceFactory; 
+    protected ProductInterfaceFactory $productInterfaceFactory;
 
     /**
      * @var ProductRepositoryInterface
@@ -90,7 +99,7 @@ class CreateSimpleProduct implements DataPatchInterface
      * @param SourceItemsSaveInterface $sourceItemsSaveInterface
      * @param CategoryLinkManagementInterface $categoryLink
      * @param CategoryCollectionFactory $categoryCollectionFactory
-     * 
+     *
      */
     public function __construct(
         State $appState,
@@ -116,12 +125,23 @@ class CreateSimpleProduct implements DataPatchInterface
 
     /**
      * Add new product
+     *
+     * @return void
      */
     public function apply(): void
     {
         $this->appState->emulateAreaCode('adminhtml', [$this, 'execute']);
     }
 
+     /**
+     * @throws CouldNotSaveException
+     * @throws InputException
+     * @throws LocalizedException
+     * @throws NoSuchEntityException
+     * @throws ValidationException
+     *
+     * @return void
+     */
     public function execute(): void
     {
         $product = $this->productInterfaceFactory->create();
@@ -142,7 +162,16 @@ class CreateSimpleProduct implements DataPatchInterface
                 ->setVisibility(Visibility::VISIBILITY_BOTH)
                 ->setStatus(Status::STATUS_ENABLED)
                 ->setStockData(['use_config_manage_stock' => 1, 'is_qty_decimal' => 0, 'is_in_stock' => 1]);
-        $product = $this->productRepository->save($product);    
+        $product = $this->productRepository->save($product);
+
+        $sourceItem = $this->sourceItemFactory->create();
+        $sourceItem->setSourceCode('default');
+        $sourceItem->setQuantity(25);
+        $sourceItem->setSku($product->getSku());
+        $sourceItem->setStatus(SourceItemInterface::STATUS_IN_STOCK);
+        $this->sourceItems[] = $sourceItem;
+
+        $this->sourceItemsSaveInterface->execute($this->sourceItems);
 
         $categoryTitles = ['Men'];
         $categoryIds = $this->categoryCollectionFactory->create()
