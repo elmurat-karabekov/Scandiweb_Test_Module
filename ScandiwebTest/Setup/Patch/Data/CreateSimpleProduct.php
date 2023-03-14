@@ -144,7 +144,7 @@ class CreateSimpleProduct implements DataPatchInterface
                 ->setStockData(['use_config_manage_stock' => 1, 'is_qty_decimal' => 0, 'is_in_stock' => 1]);
         $product = $this->productRepository->save($product);    
 
-        $categoryTitles = ['Man'];
+        $categoryTitles = ['Men'];
         $categoryIds = $this->categoryCollectionFactory->create()
             ->addAttributeToFilter('name', ['in' => $categoryTitles])
             ->getAllIds();
